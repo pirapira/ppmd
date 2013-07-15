@@ -66,7 +66,7 @@ end
 
 
 module DispatchError = struct
-  type t = [`NameUsed | `Sadly of string ] with bin_io
+  type t = NameUsed | Sadly of string with bin_io
 end
 
 let rpc = Rpc.Pipe_rpc.create
@@ -77,13 +77,32 @@ let rpc = Rpc.Pipe_rpc.create
   ~bin_error:DispatchError.bin_t
 ;;
 
+(* what kind of connection state is necessary? *)
+
+module ConState = struct
+  type t = Alive
+end
+
+let bureau (c : ConState.t) (q : Message.request) ~(aborted:unit Deferred.t) =
+  if Deferred.is_determined aborted
+  then
+    return (Error (DispatchError.Sadly "aborted"))
+  else
+    match q with
+      | Message.AliveReq r -> return (* this return is actually wrong *) (Ok (Pipe.of_list [Message.AliveResp `OK]))
+      | _ ->  return (Error (DispatchError.Sadly "not implemented"))
+
+let rpc_imple = Rpc.Pipe_rpc.implement rpc bureau
+
 (* I need a function of this type
 ('connection_state
         -> 'query
         -> aborted:unit Deferred.t
         -> ('response Pipe.Reader.t, 'error) Result.t Deferred.t)
 *)
-(* what is the Result.t here? / just like Either *)
+(* what is the Result.t here? / just like Either
+https://ocaml.janestreet.com/ocaml-core/latest/doc/core_kernel/Result.html
+*)
 (* is the error response returned back to the client?
    Aha, when the call is wrong.
 *)

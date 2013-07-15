@@ -1,4 +1,5 @@
 open Core.Std
+open Async.Std
 
 module NodeType = struct
   type t = NormalNode | HiddenNode (* ever used? *) with bin_io
@@ -64,7 +65,28 @@ module Message = struct
 end
 
 
-  (* unregister should be notified by TCP connection cut off,
-     so this is not a usual RPC server
-     but anyway, first build a usual RPC server and then consider keeping connections after alive message.
-  *)
+module DispatchError = struct
+  type t = [`NameUsed | `Sadly of string ] with bin_io
+end
+
+let rpc = Rpc.Pipe_rpc.create
+  ~name:"ppmd"
+  ~version:2
+  ~bin_query:Message.bin_request
+  ~bin_response:Message.bin_response
+  ~bin_error:DispatchError.bin_t
+;;
+
+(* I need a function of this type
+('connection_state
+        -> 'query
+        -> aborted:unit Deferred.t
+        -> ('response Pipe.Reader.t, 'error) Result.t Deferred.t)
+*)
+(* what is the Result.t here? / just like Either *)
+(* is the error response returned back to the client?
+   Aha, when the call is wrong.
+*)
+
+
+
